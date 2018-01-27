@@ -1,1 +1,31 @@
+---
+title: "Dallas Burglary Crime Analysis"
+date: '`r Sys.Date()`'
+bibliography: 
+# uncomment for markdown output:
+output:
+  md_document:
+    variant: markdown_github
+# uncomment for html output:
+# output:
+#  bookdown::html_document2:
+#    number_sections: yes
+#    toc: yes
+---
 
+<!-- Note: this is where I'm adding the write-up for now for maximum visibility.
+Can go elsewhere, e.g. as a vignette before this is open sourced. -->
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(
+  out.width = "100%",
+  collapse = TRUE,
+  comment = "#>",
+  fig.path = "README-",
+  echo = FALSE
+)
+```
+
+# Introduction
+
+Dallas City is 
