@@ -77,6 +77,88 @@ plot(districts,
 
 data <- read.table(file="Dallas_Police_RMS_for_SatScan_UTM2.csv", sep=",", head=TRUE)
 
+
+#convert the crimes' x,y coords to shapefile
+crimes_shape <- SpatialPointsDataFrame(data[,4:5], data, proj4string = coord_Sys)  #X_shape@data
+plot(crimes_shape, col = "red", pch=16, cex=0.2, add=TRUE)
+#plot(crimes_shape[1,], col = "red", pch=16, cex=3, add=TRUE)
+
+#we want select two districts with high crime density
+#number of crime point divided by the population in each district
+
+missGrid <- districts
+bus <- crimes_shape
+
+# Set a unique identifier for both of the data frames
+missGrid@data <- mutate(missGrid@data, id_grid = as.numeric(rownames(missGrid@data)))
+bus@data <- mutate(bus@data, id_bus = as.numeric(rownames(bus@data)))
+
+# The businesses get the value of the grid they are on top of
+busmis <- over(bus, missGrid)
+
+# the order didn't change so re add id_bus to the new table
+busmis <- mutate(busmis, id_bus = as.numeric(rownames(busmis)))
+
+#Now join each original business to its grid location
+busmis <- left_join(bus@data, busmis, by = c("id_bus" = "id_bus"))
+
+## Now we can aggregate the data #head(busmis@data)
+busmisa <- busmis %>% group_by(id_grid) %>%
+summarise(overlaping_Crimes = sum(count))
+
+## Now you want to join it back to the grid data for mapping
+# we are joining it straight to the missGrid spatial data frame
+missGrid@data <- left_join(missGrid@data, busmisa, by = c("id_grid" = "id_grid"))
+
+
+## Now you want to join it back to the grid data for mapping
+# we are joining it straight to the missGrid spatial data frame
+missGrid@data <- left_join(missGrid@data, busmisa, by = c("id_grid" = "id_grid"))
+
+#calculate the crime density for each district (using population as the denominator)
+
+missGrid@data$pop_Density <-  missGrid@data$overlaping_Crimes.x/
+							as.numeric(as.vector(matrix(missGrid@data$Population,length(missGrid),)))
+
+#plot the crime density.
+x <- as.numeric(as.vector(missGrid@data$pop_Density))
+x <- 1/x
+
+# plot using new colors
+plot(districts, 
+     col = grey((x-min(x))/(max(x)-min(x))),
+     main="Crime Density (denom.: pop)")
+
+
+#selecting our case study area
+#we want district 2, 6 and 11. Districts 2 and 6 because of their high crime density,
+#and district 11 because of its relatively high density and closeness to 2 and 6.
+#Besides, district 11 provide adequate spatial support for district 6 which might be prone
+#boundary effect, because of the SaTScan technique used.
+
+plot(districts[c(2,6,12),], col = scales::alpha("white", 0.05), border="red", lwd=3, add=TRUE)
+
+#merge the study area
+poly_Merged <- aggregate(districts[c(2,6,12),])
+plot(poly_Merged, col = scales::alpha("white", 0.05), border="blue", lwd=3, add=TRUE)
+
+#select the crime_points that fall within the study area boundary.
+data_subset <- bus[(which(over(bus,poly_Merged)==1)),]
+
+#select crime type of interest
+data_subset <- data_subset[which(data_subset$Type=="BURGLARY-RESIDENCE"),]  #head(data_subset)
+#nrow(data_subset)
+
+#select the time period of interest. #crimes that fal with time period "2016-01-01" & "2016-12-31" 
+
+cut1 <- which(as.Date(data_subset$date)<as.Date("2016-01-01"))    
+cut2 <- which(as.Date(data_subset$date)<=as.Date("2016-12-31"))   
+data_subset <- data_subset[setdiff(cut2, cut1),]
+data_subset <- data_subset[order(data_subset$date),]
+
+
+
+
 ```
 
 
