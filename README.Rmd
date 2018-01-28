@@ -39,7 +39,6 @@ library(rgeos)
 library(raster)
 library(plot3D)
 library(dplyr)
-#install.packages("rsatscan")
 library(rgdal)
 library(rsatscan)
 ```
@@ -49,39 +48,48 @@ library(rsatscan)
 Dallas City is 
 
 ```{r}
-td="C:/Users/monsu/Documents/GitHub/Dallas-data-analysis/resources/"
+#resetting parameter file:
+#create a .cas and .geo file
 
+#setting working directory 
+td="C:/Users/monsu/Documents/UniLeeds/RSATSCAN/"
 setwd(td)
 
+#------------------------------------------------
 #import the boundary shapefile
 districts <- readOGR(dsn=".", "final_districtMap") # head(data)
-
 
 #the coordinate of the districts shapefile
 coord_Sys <- crs(districts)
 
 # manually set the colors for the plot!
 colfunc <- colorRampPalette(c("white", "black"))
-colfunc <- colfunc(15)
+colfunc <- colfunc(14)
 colfunc <- colfunc[order(as.numeric(districts$Population))]
 
 #normalise the population column for plotting
-
 x <- as.numeric(as.vector(districts@data$Population))
 x <- 1/x
 
 # plot using new colors
 plot(districts, 
      col = grey((x-min(x))/(max(x)-min(x))),
-     main="Relative population of Dallas Districts")
+     main="Relative population of districts")
 
+#import crime dataset
 data <- read.table(file="Dallas_Police_RMS_for_SatScan_UTM2.csv", sep=",", head=TRUE)
 
+#select crime type of interest (to work with)
+data <- data[which(data$Type=="BURGLARY-RESIDENCE"),]  #head(data_subset)
+#nrow(data_subset)
 
-#convert the crimes' x,y coords to shapefile
-crimes_shape <- SpatialPointsDataFrame(data[,4:5], data, proj4string = coord_Sys)  #X_shape@data
+#kjuh
+data <- data[!duplicated(data[c('Incident_1', 'Offense_Se')]),]  #data[1:50,]
+
+#how many crimes are recorded in each district in 2016.
+#convert the crimes' x,y coords to shapefile #mode(data)
+crimes_shape <- SpatialPointsDataFrame(data[,4:5], data, proj4string = coord_Sys)  #X_shape@data crimes_shape@data
 plot(crimes_shape, col = "red", pch=16, cex=0.2, add=TRUE)
-#plot(crimes_shape[1,], col = "red", pch=16, cex=3, add=TRUE)
 
 #we want select two districts with high crime density
 #number of crime point divided by the population in each district
@@ -91,7 +99,7 @@ bus <- crimes_shape
 
 # Set a unique identifier for both of the data frames
 missGrid@data <- mutate(missGrid@data, id_grid = as.numeric(rownames(missGrid@data)))
-bus@data <- mutate(bus@data, id_bus = as.numeric(rownames(bus@data)))
+bus@data <- mutate(bus@data, id_bus = as.numeric(rownames(bus@data)))  #head(bus)
 
 # The businesses get the value of the grid they are on top of
 busmis <- over(bus, missGrid)
@@ -109,7 +117,6 @@ summarise(overlaping_Crimes = sum(count))
 ## Now you want to join it back to the grid data for mapping
 # we are joining it straight to the missGrid spatial data frame
 missGrid@data <- left_join(missGrid@data, busmisa, by = c("id_grid" = "id_grid"))
-
 
 ## Now you want to join it back to the grid data for mapping
 # we are joining it straight to the missGrid spatial data frame
@@ -129,34 +136,181 @@ plot(districts,
      col = grey((x-min(x))/(max(x)-min(x))),
      main="Crime Density (denom.: pop)")
 
-
 #selecting our case study area
 #we want district 2, 6 and 11. Districts 2 and 6 because of their high crime density,
 #and district 11 because of its relatively high density and closeness to 2 and 6.
 #Besides, district 11 provide adequate spatial support for district 6 which might be prone
 #boundary effect, because of the SaTScan technique used.
 
-plot(districts[c(2,6,12),], col = scales::alpha("white", 0.05), border="red", lwd=3, add=TRUE)
+plot(districts[c(1,3,4,5,7,8),], col = scales::alpha("white", 0.05), border="blue", lwd=3, add=TRUE)
 
 #merge the study area
-poly_Merged <- aggregate(districts[c(2,6,12),])
-plot(poly_Merged, col = scales::alpha("white", 0.05), border="blue", lwd=3, add=TRUE)
+#poly_Merged <- aggregate(districts[c(2, 6, 12),])
+
+poly_Merged <- aggregate(districts[c(1,3,4,5,7,8),])
+plot(poly_Merged, col = scales::alpha("white", 0.05), border="red", lwd=3, add=TRUE)
 
 #select the crime_points that fall within the study area boundary.
 data_subset <- bus[(which(over(bus,poly_Merged)==1)),]
 
-#select crime type of interest
-data_subset <- data_subset[which(data_subset$Type=="BURGLARY-RESIDENCE"),]  #head(data_subset)
-#nrow(data_subset)
-
-#select the time period of interest. #crimes that fal with time period "2016-01-01" & "2016-12-31" 
-
+#select crimes that fal with time period "2016-01-01" & "2016-12-31" 
 cut1 <- which(as.Date(data_subset$date)<as.Date("2016-01-01"))    
 cut2 <- which(as.Date(data_subset$date)<=as.Date("2016-12-31"))   
 data_subset <- data_subset[setdiff(cut2, cut1),]
 data_subset <- data_subset[order(data_subset$date),]
 
+#to remove duplicated crimes...
 
+#now prepare cas & geo head(cut1)
+NYCfevercas <- cbind(data_subset$id,1,as.data.frame(as.character(data_subset$date)))
+#write.table(NYCfevercas,file=paste("casefile3",".cas",sep=""),sep=" ",row.names=FALSE, col.names=FALSE) 
+	
+NYCfevergeo <- as.data.frame(cbind(data_subset$id,data_subset$x,data_subset$y))
+#write.table(NYCfevergeo,file=paste("geofile3",".geo",sep=""),sep=" ",row.names=FALSE, col.names=FALSE) 
+
+invisible(ss.options(reset=TRUE))
+
+#extract the half the study period
+min_time <- min(as.character(NYCfevercas[,3]))
+max_time <- max(as.character(NYCfevercas[,3]))
+
+max_T <- round( (as.numeric(as.Date(max_time) - as.Date(min_time))/2),digits=0)
+
+TValue <- max_T
+
+S_Value <- 1000
+
+ss.options(list(CaseFile="NYCfever.cas", PrecisionCaseTimes=3))
+ss.options(c(paste("StartDate=",(paste(substr(min_time, 1, 4),"/",substr(min_time, 6, 7),"/",substr(min_time, 9, 10),sep="")),sep=""),
+		paste("EndDate=",(paste(substr(max_time, 1, 4),"/",substr(max_time, 6, 7),"/",substr(max_time, 9, 10),sep="")),sep="")))
+
+ss.options(list(CoordinatesFile="NYCfever.geo", AnalysisType=4, ModelType=2, TimeAggregationUnits=3, CoordinatesType=0))
+ss.options(list(UseDistanceFromCenterOption="y", MaxSpatialSizeInDistanceFromCenter=S_Value, NonCompactnessPenalty=0))
+ss.options(list(MaxTemporalSizeInterpretation=1, MaxTemporalSize=TValue))
+ss.options(list(ProspectiveStartDate=as.character((paste(substr(max_time, 1, 4),"/",substr(max_time, 6, 7),"/",substr(max_time, 9, 10),sep=""))), 
+		ReportGiniClusters="n", LogRunToHistoryFile="n", MonteCarloReps=999))
+
+#ss.options()
+#td = tempdir()
+write.ss.prm(td, "NYCfever")
+write.cas(NYCfevercas, td, "NYCfever")
+write.geo(NYCfevergeo, td, "NYCfever")
+
+## ------------------------------------------------------------------------
+NYCfever = satscan(td, "NYCfever")
+
+Result <- NYCfever$col
+#----------------------------------------------------------
+
+#creating the format required...(as above)
+
+ dataSN <- 1:nrow(Result) 
+ dataX <- Result$X
+ dataY <- Result$Y
+ dataST <- as.Date(Result$START_DATE)
+ dataT <- as.Date(Result$END_DATE)
+ dataR <- round(Result$RADIUS,digits=0)
+ dataS <- round(Result$TEST_STAT,digits=3)
+ dataP <- Result$P_VALUE
+ dataObs <- round(Result$OBSERVED,digits=3)
+ dataExp <- round(Result$EXPECTED,digits=3)
+ dataRR <- round(Result$ODE, digits=3)
+
+final_Result <- cbind(dataSN, dataX,  dataY,  as.character(dataST), as.character(dataT), dataR, dataS,  dataP,
+					dataObs, dataExp,  dataRR)   
+
+
+colnames(final_Result)<-c("dataSN", "dataX",  "dataY",  "dataST", "dataT", "dataR", "dataS",  "dataP",
+					"dataObs", "dataExp",  "dataRR")   
+
+#-------------------------------------------
+#satscan result
+#sat_Result <- read.table(file="final_Result_SatScan_sample.csv", sep=",", head=TRUE)
+#sat_Result <- read.table(file="result_JH.col_2_upper.csv", sep=",", head=TRUE)
+sat_Result <- read.table(file="result_JH.col_2_lowerPortion.csv", sep=",", head=TRUE) #head(sat_Result)
+
+ dataSN <- 1:nrow(sat_Result) 
+ dataX <- as.data.frame(sat_Result$X)
+ dataY <- as.data.frame(sat_Result$Y)
+ dataST <- as.Date(sat_Result$START_DATE)
+ dataT <- as.Date(sat_Result$END_DATE)
+ dataR <- round(sat_Result$RADIUS,digits=0)
+ dataS <- round(sat_Result$TEST_STAT,digits=3)
+ dataP <- sat_Result$P_VALUE
+ dataObs <- round(sat_Result$OBSERVED,digits=3)
+ dataExp <- round(sat_Result$EXPECTED,digits=3)
+ dataRR <- round(sat_Result$ODE, digits=3)
+
+sat_Result <- cbind(dataSN, dataX,  dataY,  as.character(dataST), as.character(dataT), dataR, dataS,  dataP,
+					dataObs, dataExp,  dataRR)   
+
+colnames(sat_Result)<-c("dataSN", "x",  "y",  "dataST", "dataT", "RADIUS", "dataS",  "dataP",
+					"dataObs", "dataExp",  "dataRR")   
+
+#to modify clusters with radius zero
+for(h in 1: nrow(sat_Result)){
+		if (sat_Result[h, 6] <= 10){
+				sat_Result[h, 6] <- 10
+			}
+		 }
+#sat_Result <- sat_Result
+#-------------------------------------------
+
+#-------------------------------------------
+#to modify clusters with radius zero
+for(h in 1: nrow(sat_Result)){
+		if (sat_Result[h, 6] <= 10){
+				sat_Result[h, 6] <- 10
+			}
+		 }
+#sat_Result <- as.data.frame(sat_Result)
+#-------------------------------------------
+
+#write.table(final_Result, file="result_retrospective", sep=",")
+#show how many clusters are significant
+
+final_Result_sign <- sat_Result[which(as.matrix(sat_Result$dataP) <= 0.06),]
+
+#plotting the study area, clusters_buffered, and ...crime points.
+plot(poly_Merged, col = scales::alpha("white", 0.05), border="blue", lwd=3)
+
+#buffering the clusters by their radius
+#convert to shapefile #as.matrix(final_Result_sign[,2:3])  #mode(final_Result_sign)  #head(data)
+final_Result_sign_Shape <- SpatialPointsDataFrame(final_Result_sign[,2:3], final_Result_sign, proj4string = coord_Sys)  #X_shape@data
+
+#buffering
+final_Result_sign_Shape_Buff <- gBuffer(final_Result_sign_Shape, width=final_Result_sign_Shape@data$RADIUS, byid=TRUE, quadsegs=10)
+
+#buffering
+#final_Result_sign_Shape_Buff <- gBuffer(final_Result_sign_Shape, width=final_Result_sign_Shape@data$dataR, byid=TRUE, quadsegs=10)
+
+plot(final_Result_sign_Shape_Buff, col = "red", pch=16, cex=0.2, add=TRUE)
+
+#overlaying the crime points
+plot(data_subset, col = "black", pch=16, cex=0.5, add=TRUE)
+
+#spatial analysis
+#loop through each cluster and select crime points that fall within...
+
+for(k in 1:length(final_Result_sign_Shape_Buff)){#111  k<-4
+
+#ovelay the points on the cluster
+inter_Clusters <- over(data_subset, final_Result_sign_Shape_Buff[k,])  #dim(inter_Clusters) #dim(final_Result_sign_Shape_Buff[k,]@data
+
+#select the point that intersect the cluster spatially
+id_Intersected_Crimes <- row.names(inter_Clusters[which(inter_Clusters[,1]!="NA"),])
+id_Intersected_Crimes <- data[which(row.names(data)%in%id_Intersected_Crimes),]
+
+#filter by date
+#select the point that happened within the time duration of the cluster.
+
+	pts_begin <- which(as.vector(id_Intersected_Crimes$date) >= as.vector(final_Result_sign_Shape_Buff[k,]@data$dataST))
+
+	pts_end <- which(as.vector(id_Intersected_Crimes$date) <= as.vector(final_Result_sign_Shape_Buff[k,]@data$dataT))
+
+	points_intersect <- id_Intersected_Crimes[intersect(pts_end, pts_begin),]
+
+}#111
 
 
 ```
