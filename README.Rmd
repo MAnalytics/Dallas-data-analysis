@@ -59,10 +59,10 @@ setwd(td)
 #import the boundary shapefile
 districts <- readOGR(dsn=".", "final_districtMap") # head(data)
 
-#the coordinate of the districts shapefile
+#extracting the coordinate system of the districts shapefile
 coord_Sys <- crs(districts)
 
-# manually set the colors for the plot!
+# manually setting the colors for the plot!
 colfunc <- colorRampPalette(c("white", "black"))
 colfunc <- colfunc(14)
 colfunc <- colfunc[order(as.numeric(districts$Population))]
