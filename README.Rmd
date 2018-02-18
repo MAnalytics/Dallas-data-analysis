@@ -48,6 +48,7 @@ library(rsatscan)
 Dallas City is 
 
 ```{r}
+
 #resetting parameter file:
 #create a .cas and .geo file
 
@@ -288,8 +289,10 @@ plot(final_Result_sign_Shape_Buff, col = "red", pch=16, cex=0.2, add=TRUE)
 
 #overlaying the crime points
 plot(data_subset, col = "black", pch=16, cex=0.5, add=TRUE)
-
+plot(data_subset, col = "black", pch=15, cex=0.5, add=TRUE)
+     
 #spatial analysis
+#loop through each cluster and select crime points that fall within...
 #loop through each cluster and select crime points that fall within...
 
 for(k in 1:length(final_Result_sign_Shape_Buff)){#111  k<-4
